@@ -1,51 +1,82 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { ApplicationProvider } from 'react-native-ui-kitten';
-import { mapping, light, dark } from '@eva-design/eva';
-import { Button, Text, Layout } from 'react-native-ui-kitten';
+import {
+  Button,
+  Header,
+  Text,
+  ThemeProvider
+} from 'react-native-elements';
+import { theme } from './theme';
+import {
+  CLIENTKEY,
+  CLIENTSECRET
+} from 'react-native-dotenv';
+import OAuth from 'oauth-1.0a';
+import cryptojs from 'crypto-js';
+import hmacSHA1 from 'crypto-js/hmac-sha1';
 
-export class Home extends React.Component {
-  constructor(props) {
-    super(props);
-  }
+// Define URLs
+const TEMPORARY_CREDENTIAL_REQUEST = 'https://www.zotero.org/oauth/request';
+const TOKEN_REQUEST_URL = 'https://www.zotero.org/oauth/access';
+const RESOURCE_OWNER_AUTHORIZATION_URI = 'https://www.zotero.org/oauth/authorize';
 
-  render() {
-    return (
-      <Layout style={styles.container}>
-        <Text>Use Dark Mode?</Text>
-        <Button onPress={this.props.toggleTheme}>🌚{this.props.selectedTheme}</Button>
-      </Layout>
-    );
-  }
-}
+const oauth = OAuth({
+    consumer: { key: CLIENTKEY, secret: CLIENTSECRET },
+    signature_method: 'HMAC-SHA1',
+    hash_function(base_string, key) {
+        return hmacSHA1(base_string,key).toString(cryptojs.enc.Base64)
+    },
+})
 
-const themes = { light: light, dark: dark };
-
+// Application entry component
 export default class App extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {theme: 'light'};
-    this.toggleTheme = this.toggleTheme.bind(this);
+    this.state = {
+      response: ''
+    };
   }
 
-  toggleTheme() {
-    var nextTheme = this.state.theme === 'light' ? 'dark' : 'light';
-    this.setState({theme: nextTheme});
-  };
+  componentDidMount() {
+    // set self
+    var self = this;
+
+    fetch(
+      TEMPORARY_CREDENTIAL_REQUEST,
+      {
+        headers: {...oauth.toHeader(oauth.authorize({
+            url: TEMPORARY_CREDENTIAL_REQUEST,
+            method: 'GET'
+          })),
+
+        }
+      }
+    ).then( response => {
+        if (!response.ok) { throw Error(response.statusText); }
+        response.text().then( text => {
+          var response_object = Object();
+          var data = text.split('&');
+          for (var element of data) {
+            var [key, value] = element.split('=');
+            response_object[key] = value;
+          }
+          console.log(response_object);
+        });
+      }
+    ).catch(error => {
+      console.warn(error);
+    });
+  }
 
   render() {
     return (
-      <ApplicationProvider mapping={mapping} theme={themes[this.state.theme]}>
-        <Home toggleTheme={this.toggleTheme} selectedTheme={this.state.theme} />
-      </ApplicationProvider>
+      <ThemeProvider theme={theme}>
+        <Header
+          leftComponent={{ icon: 'menu' }}
+          centerComponent={{ text: 'cognita' }}
+        />
+      <Text>CLIENTKEY={CLIENTKEY}</Text>
+      <Text>CLIENTSECRET={CLIENTSECRET}</Text>
+      </ThemeProvider>
     );
   }
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  }
-});
+}
