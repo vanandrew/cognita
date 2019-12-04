@@ -13,11 +13,13 @@ import {
 import OAuth from 'oauth-1.0a';
 import cryptojs from 'crypto-js';
 import hmacSHA1 from 'crypto-js/hmac-sha1';
+import { Linking, WebBrowser } from 'expo';
 
 // Define URLs
 const TEMPORARY_CREDENTIAL_REQUEST = 'https://www.zotero.org/oauth/request';
 const TOKEN_REQUEST_URL = 'https://www.zotero.org/oauth/access';
 const RESOURCE_OWNER_AUTHORIZATION_URI = 'https://www.zotero.org/oauth/authorize';
+const APP_CALLBACK_URL = 'exp://wg-qka.community.app.exp.direct:80';
 
 const oauth = OAuth({
     consumer: { key: CLIENTKEY, secret: CLIENTSECRET },
@@ -44,10 +46,9 @@ export default class App extends React.Component {
       TEMPORARY_CREDENTIAL_REQUEST,
       {
         headers: {...oauth.toHeader(oauth.authorize({
-            url: TEMPORARY_CREDENTIAL_REQUEST,
+            url: `${TEMPORARY_CREDENTIAL_REQUEST}?oauth_callback=${APP_CALLBACK_URL}`,
             method: 'GET'
           })),
-
         }
       }
     ).then( response => {
@@ -60,11 +61,21 @@ export default class App extends React.Component {
             response_object[key] = value;
           }
           console.log(response_object);
+
+          var RESOURCE_OWNER_KEY = response_object['oauth_token'];
+          var RESOURCE_OWNER_SECRET = response_object['oauth_token_secret'];
+
+          self._openBrowserLink(`${RESOURCE_OWNER_AUTHORIZATION_URI}?oauth_token=${RESOURCE_OWNER_KEY}`);
+
         });
       }
     ).catch(error => {
       console.warn(error);
     });
+  }
+
+  async _openBrowserLink(weblink) {
+    let result = await WebBrowser.openBrowserAsync(weblink)
   }
 
   render() {
